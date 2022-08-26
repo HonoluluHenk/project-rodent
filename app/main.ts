@@ -1,6 +1,6 @@
-import {app, BrowserWindow, screen} from 'electron';
-import * as path from 'path';
+import {app, BrowserWindow, ipcMain, screen} from 'electron';
 import * as fs from 'fs';
+import * as path from 'path';
 
 let win: BrowserWindow = null;
 const args = process.argv.slice(1),
@@ -14,8 +14,8 @@ function createWindow(): BrowserWindow {
   win = new BrowserWindow({
     x: 0,
     y: 0,
-    width: size.width,
-    height: size.height,
+    width: size.width / 2,
+    height: size.height / 2,
     webPreferences: {
       nodeIntegration: true,
       allowRunningInsecureContent: (serve),
@@ -29,12 +29,13 @@ function createWindow(): BrowserWindow {
 
     require('electron-reloader')(module);
     win.loadURL('http://localhost:4200');
+
   } else {
     // Path when running electron executable
     let pathIndex = './index.html';
 
     if (fs.existsSync(path.join(__dirname, '../dist/index.html'))) {
-       // Path when running electron in local folder
+      // Path when running electron in local folder
       pathIndex = '../dist/index.html';
     }
 
@@ -50,6 +51,17 @@ function createWindow(): BrowserWindow {
     win = null;
   });
 
+  win.on('ready-to-show', () => {
+    setInterval(
+      () => {
+        console.log('tick')
+        win.webContents.send('toFrontend', {hello: 'frontend'});
+      },
+      1000,
+    )
+
+  })
+
   return win;
 }
 
@@ -57,8 +69,11 @@ try {
   // This method will be called when Electron has finished
   // initialization and is ready to create browser windows.
   // Some APIs can only be used after this event occurs.
-  // Added 400 ms to fix the black background issue while using transparent window. More detais at https://github.com/electron/electron/issues/15947
-  app.on('ready', () => setTimeout(createWindow, 400));
+  // Added 400 ms to fix the black background issue while using transparent window. More detais at
+  // https://github.com/electron/electron/issues/15947
+  app.on('ready', () => {
+    setTimeout(createWindow, 400);
+  });
 
   // Quit when all windows are closed.
   app.on('window-all-closed', () => {
@@ -76,6 +91,19 @@ try {
       createWindow();
     }
   });
+
+  console.log('...started')
+
+  ipcMain.on('foo', (event, data) => {
+    console.log('message from frontend', data)
+
+    event.reply('toFrontend', {hello: 'from backend'});
+    // ipcMain.emit('toFrontend', {hello: 'from backend'});
+  })
+
+  // ipcMain.on('toFrontend', (data) => {
+  //   console.log('loopback', data);
+  // })
 
 } catch (e) {
   // Catch Error
